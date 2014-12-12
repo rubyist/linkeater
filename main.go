@@ -23,6 +23,7 @@ type Config struct {
 	Channel   string
 	Nick      string `configura:",linkeater"`
 	LookupCmd string `configura:",^url"`
+	RepostMsg string `configura:",Repost:"`
 	DB        string `configura:",linkeater.db"`
 }
 
@@ -128,7 +129,7 @@ func storelinks(links []string, e *irc.Event, c *irc.Connection, db *bolt.DB) {
 					continue
 				}
 
-				c.Privmsgf(config.Channel, "Nice repost, ass. %s already posted that on %s", decoded.User, decoded.Time.Format(timeFmt))
+				c.Privmsgf(config.Channel, "%s %s posted that on %s", config.RepostMsg, decoded.User, decoded.Time.Format(timeFmt))
 			} else {
 				log.Printf("Storing link: %s", link)
 				encoded, err := encodeLinkFromEvent(link, e)

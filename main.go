@@ -53,7 +53,11 @@ func main() {
 
 	log.Print("Connecting")
 	c := irc.IRC(config.Nick, config.Nick)
-	c.Connect(config.Host)
+	err = c.Connect(config.Host)
+	if err != nil {
+		log.Fatalf("Error connecting: %s", err.Error())
+		os.Exit(1)
+	}
 	c.Join(config.Channel)
 
 	c.AddCallback("PRIVMSG", func(e *irc.Event) {

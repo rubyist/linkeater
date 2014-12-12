@@ -131,7 +131,7 @@ func storelinks(links []string, e *irc.Event, c *irc.Connection, db *bolt.DB) {
 
 				c.Privmsgf(config.Channel, "%s %s posted that on %s", config.RepostMsg, decoded.User, decoded.Time.Format(timeFmt))
 			} else {
-				log.Printf("Storing link: %s", link)
+				log.Printf("Storing link: %s from %s", link, e.Nick)
 				encoded, err := encodeLinkFromEvent(link, e)
 				if err != nil {
 					log.Printf("Error encoding link %s: %s", link, err.Error())

@@ -178,6 +178,7 @@ func storelinks(links []string, e *irc.Event, c *irc.Connection, db *bolt.DB) {
 				encoded, err := encodeLinkFromEvent(link, e)
 				if err != nil {
 					log.Printf("Error encoding link %s: %s", link, err.Error())
+					continue
 				}
 				b.Put([]byte(link), encoded)
 

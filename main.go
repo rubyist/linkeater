@@ -48,7 +48,7 @@ func main() {
 	defer db.Close()
 
 	db.Update(func(tx *bolt.Tx) error {
-		tx.CreateBucket([]byte("urls"))
+		tx.CreateBucketIfNotExists([]byte("urls"))
 		return nil
 	})
 
@@ -83,13 +83,35 @@ func main() {
 }
 
 func seekout(term string, c *irc.Connection, db *bolt.DB) {
-	r, err := regexp.Compile(strings.TrimSpace(term))
-	if err != nil {
-		c.Privmsg(config.Channel, "That ain't a regex, mang.")
-		return
+	match := strings.TrimSpace(term)
+	var links []Link
+
+	if strings.HasPrefix(match, "/") && strings.HasSuffix(match, "/") {
+		links = linksMatchingRegex(match, c, db)
+		if len(links) == 0 {
+			c.Privmsg(config.Channel, "Ain't found no matching links.")
+			return
+		}
+	} else {
+		links = linksMatchingNick(match, db)
+		if len(links) == 0 {
+			c.Privmsgf(config.Channel, "No links from %s", match)
+			return
+		}
 	}
 
+	for _, link := range links {
+		c.Privmsg(config.Channel, link.Url)
+	}
+}
+
+func linksMatchingRegex(regex string, c *irc.Connection, db *bolt.DB) []Link {
 	var links []Link
+	r, err := regexp.Compile(regex[1 : len(regex)-1])
+	if err != nil {
+		c.Privmsg(config.Channel, "That ain't a regex, mang.")
+		return links
+	}
 
 	db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("urls"))
@@ -106,15 +128,32 @@ func seekout(term string, c *irc.Connection, db *bolt.DB) {
 		})
 		return nil
 	})
+	return links
+}
 
-	if len(links) == 0 {
-		c.Privmsg(config.Channel, "Ain't found no matching links.")
-		return
-	}
+func linksMatchingNick(nick string, db *bolt.DB) []Link {
+	var links []Link
 
-	for _, link := range links {
-		c.Privmsg(config.Channel, link.Url)
-	}
+	db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(nick))
+		if b == nil {
+			return nil
+		}
+
+		b.ForEach(func(k, v []byte) error {
+			l, err := decodeLink(v)
+			if err != nil {
+				log.Printf("Could not decode link %s: %s", string(k), err.Error())
+				return nil
+			}
+			links = append(links, l)
+			return nil
+		})
+
+		return nil
+	})
+
+	return links
 }
 
 func storelinks(links []string, e *irc.Event, c *irc.Connection, db *bolt.DB) {
@@ -141,6 +180,11 @@ func storelinks(links []string, e *irc.Event, c *irc.Connection, db *bolt.DB) {
 					log.Printf("Error encoding link %s: %s", link, err.Error())
 				}
 				b.Put([]byte(link), encoded)
+
+				ub, err := tx.CreateBucketIfNotExists([]byte(e.Nick))
+				if err == nil {
+					ub.Put([]byte(link), encoded)
+				}
 			}
 		}
 		return nil
